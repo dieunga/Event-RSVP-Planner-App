@@ -9,11 +9,11 @@ terraform {
 
 # Default provider for your main region
 provider "aws" {
-  region = "us-east-1" # Change to your preferred primary region
+  region = var.aws_region
 }
 
 # Aliased provider strictly for WAF (CloudFront requirement)
 provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
+  alias  = "ap-southeast-1"
+  region = "ap-southeast-1"
 }
