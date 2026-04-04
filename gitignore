@@ -1,0 +1,13 @@
+# Ignore local terraform massive folders
+**/.terraform/
+**/.terraform.*
+
+# Ignore secure state files
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+
+# Ignore crash logs
+**/crash.log
+**/crash.*.log

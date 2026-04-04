@@ -1,6 +1,0 @@
-aws_region         = "ap-southeast-1"
-vpc_cidr           = "10.0.0.0/16"
-public_subnet_cidr = "10.0.1.0/24"
-ami_id             = "ami-0e7ff22101b84bcff"  
-key_name           = "ubuntu-home"
-instance_name      = "My Web Server"
