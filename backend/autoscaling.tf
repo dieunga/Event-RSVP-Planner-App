@@ -1,16 +1,16 @@
-# Retrieve latest Ubuntu 22.04 AMI
-data "aws_ami" "ubuntu_22_04" {
+# Retrieve latest Ubuntu 24.04 AMI
+data "aws_ami" "ubuntu_24_04" {
   most_recent = true
   owners      = ["099720109477"]
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-noble-24.04-amd64-server-*"]
   }
 }
 
 resource "aws_launch_template" "web_template" {
   name_prefix   = "web-template-"
-  image_id      = data.aws_ami.ubuntu_22_04.id
+  image_id      = data.aws_ami.ubuntu_24_04.id
   instance_type = var.instance_type
 
   network_interfaces {
