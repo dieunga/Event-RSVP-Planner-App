@@ -37,3 +37,9 @@ variable "instance_name" {
   type        = string
   default     = "My Web Server"
 }
+
+variable "domain_name" {
+  description = "Domain name for Route53 and ACM (e.g., example.com)"
+  type        = string
+  default     = "mywebsite.local" 
+}
