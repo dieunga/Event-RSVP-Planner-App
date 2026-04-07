@@ -1,3 +1,15 @@
+<?php
+require 'config.php';
+
+// Check if the user is logged in. If not, kick them to the login page.
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+// Optional: Extract just the name from the email for display
+$display_name = explode('@', $_SESSION['user_email'])[0];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,7 +35,8 @@
         <button class="nav-btn" data-view="rsvps">RSVPs</button>
       </nav>
       <div class="header-user">
-        <span class="user-name" id="userName">User1</span>
+        <span class="user-name" id="userName"><?php echo htmlspecialchars($display_name); ?></span>
+        <a href="logout.php" style="color: var(--text-secondary); text-decoration: none; font-size: 12px; margin-left: 10px;">Logout</a>
       </div>
       <button class="btn-primary" id="openCreateModal">+ New Event</button>
     </div>

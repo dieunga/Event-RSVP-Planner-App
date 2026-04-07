@@ -1,3 +1,43 @@
+<?php
+require 'config.php';
+
+// Redirect to index if already logged in
+if (isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit;
+}
+
+$error = '';
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+
+    if ($password !== $confirm_password) {
+        $error = "Passwords do not match.";
+    } else {
+        // Check if email exists
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        if ($stmt->rowCount() > 0) {
+            $error = "Email is already registered.";
+        } else {
+            // Hash password and insert
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO users (email, password) VALUES (?, ?)");
+            if ($stmt->execute([$email, $hashed_password])) {
+                header("Location: login.php?signup=success");
+                exit;
+            } else {
+                $error = "Something went wrong. Please try again.";
+            }
+        }
+    }
+}
+?>
+
+<!DOCTYPE html>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +54,7 @@
   <!-- HEADER -->
   <header class="site-header">
     <div class="header-inner">
-      <a href="index.html" class="logo">
+      <a href="index.php" class="logo">
         <span class="logo-mark">◆</span>
         <span class="logo-text">Soirée</span>
       </a>
@@ -69,7 +109,7 @@
 
       <p class="auth-footer">
         Already have an account? 
-        <a href="login.html" class="form-link auth-link">Sign In</a>
+        <a href="login.php" class="form-link auth-link">Sign In</a>
       </p>
     </div>
   </section>
