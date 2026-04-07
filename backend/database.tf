@@ -1,10 +1,6 @@
 resource "aws_db_subnet_group" "main" {
   name       = "main-db-subnet-group"
-  subnet_ids = [aws_subnet.db_subnet.id, aws_subnet.db_subnet_dummy.id]
-  
-  tags = {
-    Name = "My DB subnet group"
-  }
+  subnet_ids = [aws_subnet.db_subnet_a.id, aws_subnet.db_subnet_b.id]
 }
 
 resource "aws_db_instance" "primary_db" {
@@ -20,5 +16,6 @@ resource "aws_db_instance" "primary_db" {
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   
   multi_az               = false
+  availability_zone      = "${var.aws_region}b"
   skip_final_snapshot    = true
 }
