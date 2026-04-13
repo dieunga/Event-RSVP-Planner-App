@@ -1,0 +1,17 @@
+# Istio Gateway - exposes services via Internet-facing Load Balancer
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: soiree-gateway
+  namespace: soiree
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "dieunga.io.vn"
+        - "*.dieunga.io.vn"

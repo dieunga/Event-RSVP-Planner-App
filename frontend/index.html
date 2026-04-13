@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Soirée — Event Manager</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Josefin+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-mark">◆</span>
+        <span class="logo-text">Soirée</span>
+      </div>
+      <nav class="header-nav">
+        <button class="nav-btn active" data-view="events">Events</button>
+        <button class="nav-btn" data-view="rsvps">RSVPs</button>
+      </nav>
+      <div class="header-user">
+        <span class="user-name" id="userName">User1</span>
+        <a href="#" id="logoutLink" style="color: var(--text-secondary); text-decoration: none; font-size: 12px; margin-left: 10px;">Logout</a>
+      </div>
+      <button class="btn-primary" id="openCreateModal">+ New Event</button>
+    </div>
+  </header>
+
+  <!-- HERO STRIP -->
+  <section class="hero-strip">
+    <div class="hero-inner">
+      <p class="hero-eyebrow">Your Private Collection</p>
+      <h1 class="hero-title">Curate the<br /><em>Extraordinary</em></h1>
+      <div class="hero-stats" id="heroStats">
+        <div class="stat">
+          <span class="stat-number" id="statEvents">0</span>
+          <span class="stat-label">Events</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-number" id="statRsvps">0</span>
+          <span class="stat-label">RSVPs</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-number" id="statUpcoming">0</span>
+          <span class="stat-label">Upcoming</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-ornament"></div>
+  </section>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- EVENTS VIEW -->
+    <section class="view active" id="view-events">
+      <div class="section-header">
+        <h2 class="section-title">All Events</h2>
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="upcoming">Upcoming</button>
+          <button class="filter-btn" data-filter="past">Past</button>
+        </div>
+      </div>
+      <div class="events-grid" id="eventsGrid">
+        <!-- Event cards injected here -->
+        <div class="empty-state" id="emptyEvents">
+          <div class="empty-icon">◇</div>
+          <p class="empty-title">No events yet</p>
+          <p class="empty-sub">Create your first event to get started.</p>
+          <button class="btn-primary" onclick="document.getElementById('openCreateModal').click()">+ New Event</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RSVPS VIEW -->
+    <section class="view" id="view-rsvps">
+      <div class="section-header">
+        <h2 class="section-title">All RSVPs</h2>
+      </div>
+      <div class="rsvp-table-wrap" id="rsvpTableWrap">
+        <div class="empty-state" id="emptyRsvps">
+          <div class="empty-icon">◇</div>
+          <p class="empty-title">No RSVPs yet</p>
+          <p class="empty-sub">RSVPs will appear here once guests register.</p>
+        </div>
+        <table class="rsvp-table" id="rsvpTable" style="display:none">
+          <thead>
+            <tr>
+              <th>Guest</th>
+              <th>Email</th>
+              <th>Event</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rsvpTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================== MODALS ===================== -->
+
+  <!-- CREATE EVENT MODAL -->
+  <div class="modal-overlay" id="createEventModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">New Event</h3>
+        <button class="modal-close" data-close="createEventModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Event Name <span class="req">*</span></label>
+          <input type="text" class="form-input" id="evtName" placeholder="e.g. Spring Gala 2025" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Date <span class="req">*</span></label>
+            <input type="date" class="form-input" id="evtDate" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time <span class="req">*</span></label>
+            <input type="time" class="form-input" id="evtTime" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location <span class="req">*</span></label>
+          <input type="text" class="form-input" id="evtLocation" placeholder="e.g. The Grand Ballroom, New York" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-input" id="evtCategory">
+              <option value="Social">Social</option>
+              <option value="Corporate">Corporate</option>
+              <option value="Wedding">Wedding</option>
+              <option value="Conference">Conference</option>
+              <option value="Birthday">Birthday</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Capacity</label>
+            <input type="number" class="form-input" id="evtCapacity" placeholder="e.g. 150" min="1" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-input form-textarea" id="evtDescription" placeholder="Describe your event…"></textarea>
+        </div>
+        <p class="form-error" id="createError"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-close="createEventModal">Cancel</button>
+        <button class="btn-primary" id="saveEventBtn">Create Event</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EVENT DETAIL MODAL -->
+  <div class="modal-overlay" id="eventDetailModal">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <span class="modal-eyebrow" id="detailCategory"></span>
+          <h3 class="modal-title" id="detailName"></h3>
+        </div>
+        <button class="modal-close" data-close="eventDetailModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-meta">
+          <div class="detail-meta-item">
+            <span class="detail-meta-icon">📅</span>
+            <span id="detailDate"></span>
+          </div>
+          <div class="detail-meta-item">
+            <span class="detail-meta-icon">📍</span>
+            <span id="detailLocation"></span>
+          </div>
+          <div class="detail-meta-item">
+            <span class="detail-meta-icon">👥</span>
+            <span id="detailCapacity"></span>
+          </div>
+        </div>
+        <p class="detail-description" id="detailDescription"></p>
+
+        <div class="rsvp-progress-bar-wrap">
+          <div class="rsvp-progress-label">
+            <span>RSVP Capacity</span>
+            <span id="detailProgressText"></span>
+          </div>
+          <div class="rsvp-progress-track">
+            <div class="rsvp-progress-fill" id="detailProgressFill"></div>
+          </div>
+        </div>
+
+        <div class="rsvp-section">
+          <h4 class="rsvp-section-title">Add RSVP</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Guest Name <span class="req">*</span></label>
+              <input type="text" class="form-input" id="rsvpName" placeholder="Full name" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email <span class="req">*</span></label>
+              <input type="email" class="form-input" id="rsvpEmail" placeholder="email@example.com" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Status</label>
+              <select class="form-input" id="rsvpStatus">
+                <option value="Attending">Attending</option>
+                <option value="Maybe">Maybe</option>
+                <option value="Declined">Declined</option>
+              </select>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+              <button class="btn-primary" style="width:100%;" id="addRsvpBtn">Add Guest</button>
+            </div>
+          </div>
+          <p class="form-error" id="rsvpError"></p>
+        </div>
+
+        <div class="rsvp-guest-list">
+          <h4 class="rsvp-section-title">Guest List <span class="guest-count" id="guestCount"></span></h4>
+          <div id="guestListBody"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-danger" id="deleteEventBtn">Delete Event</button>
+        <button class="btn-ghost" data-close="eventDetailModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+  <!-- app.js handles all logic via API calls -->
+</body>
+</html>

@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-$host = 'localhost';
+$host = 'database-1.cfmmi4iqyrkp.ap-southeast-1.rds.amazonaws.com';
 $dbname = 'webdb';
 $username = 'admin'; 
 $password = 'admin123';     

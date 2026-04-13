@@ -1,0 +1,63 @@
+# Istio VirtualService - routes traffic to microservices
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: soiree-virtualservice
+  namespace: soiree
+spec:
+  hosts:
+    - "dieunga.io.vn"
+  gateways:
+    - soiree-gateway
+  http:
+    # Auth service routes
+    - match:
+        - uri:
+            prefix: /api/auth
+      route:
+        - destination:
+            host: auth-service
+            port:
+              number: 3001
+      timeout: 10s
+      retries:
+        attempts: 3
+        perTryTimeout: 3s
+
+    # Event service routes
+    - match:
+        - uri:
+            prefix: /api/events
+      route:
+        - destination:
+            host: event-service
+            port:
+              number: 3002
+      timeout: 10s
+      retries:
+        attempts: 3
+        perTryTimeout: 3s
+
+    # RSVP service routes
+    - match:
+        - uri:
+            prefix: /api/rsvps
+      route:
+        - destination:
+            host: rsvp-service
+            port:
+              number: 3003
+      timeout: 10s
+      retries:
+        attempts: 3
+        perTryTimeout: 3s
+
+    # Frontend (default route - catch all)
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: frontend
+            port:
+              number: 80
