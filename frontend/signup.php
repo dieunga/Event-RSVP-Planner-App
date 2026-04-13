@@ -3,18 +3,21 @@ require 'config.php';
 
 // Redirect to index if already logged in
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    header("Location: /index.php");
     exit;
 }
 
 $error = '';
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
 
-    if ($password !== $confirm_password) {
+    if (empty($name)) {
+        $error = "Full name is required.";
+    } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
         // Check if email exists
@@ -25,9 +28,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         } else {
             // Hash password and insert
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (email, password) VALUES (?, ?)");
-            if ($stmt->execute([$email, $hashed_password])) {
-                header("Location: login.php?signup=success");
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+            if ($stmt->execute([$name, $email, $hashed_password])) {
+                header("Location: /login.php?signup=success");
                 exit;
             } else {
                 $error = "Something went wrong. Please try again.";
@@ -37,7 +40,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 ?>
 
-<!DOCTYPE html>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -69,12 +71,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <p class="auth-subtitle">Join us to start managing events</p>
       </div>
 
-      <form class="auth-form" id="signupForm">
+      <form class="auth-form" id="signupForm" method="POST" action="signup.php">
+        <div class="form-group">
+          <label for="name" class="form-label">Full Name</label>
+          <input 
+            type="text" 
+            id="name" 
+            name="name"
+            class="form-input" 
+            placeholder="Your name"
+            required
+          />
+        </div>
+
         <div class="form-group">
           <label for="email" class="form-label">Email Address</label>
           <input 
             type="email" 
             id="email" 
+            name="email"
             class="form-input" 
             placeholder="you@example.com"
             required
@@ -86,6 +101,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
           <input 
             type="password" 
             id="password" 
+            name="password"
             class="form-input" 
             placeholder="••••••••"
             required
@@ -98,6 +114,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
           <input 
             type="password" 
             id="confirm-password" 
+            name="confirm_password"
             class="form-input" 
             placeholder="••••••••"
             required

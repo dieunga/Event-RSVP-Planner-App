@@ -1,0 +1,142 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: ap-southeast-1
+  EKS_CLUSTER_NAME: soiree-eks-cluster
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com
+
+jobs:
+  # ── Build and Test ──
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, event-service, rsvp-service]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+
+  # ── Build and Push Docker Images ──
+  build-push-images:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: auth-service
+            context: services/auth-service
+            ecr_repo: soiree/auth-service
+          - service: event-service
+            context: services/event-service
+            ecr_repo: soiree/event-service
+          - service: rsvp-service
+            context: services/rsvp-service
+            ecr_repo: soiree/rsvp-service
+          - service: frontend
+            context: frontend
+            ecr_repo: soiree/frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:latest
+            ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}
+
+  # ── Deploy to EKS ──
+  deploy:
+    needs: build-push-images
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Update image tags in K8s manifests
+        run: |
+          cd k8s
+          for file in auth-service.yaml event-service.yaml rsvp-service.yaml frontend.yaml; do
+            sed -i "s|<AWS_ACCOUNT_ID>|${{ secrets.AWS_ACCOUNT_ID }}|g" $file
+            sed -i "s|:latest|:${{ github.sha }}|g" $file
+          done
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/redis.yaml
+          kubectl apply -f k8s/kafka.yaml
+          kubectl apply -f k8s/auth-service.yaml
+          kubectl apply -f k8s/event-service.yaml
+          kubectl apply -f k8s/rsvp-service.yaml
+          kubectl apply -f k8s/frontend.yaml
+
+      - name: Apply Istio configurations
+        run: |
+          kubectl apply -f k8s/istio-gateway.yaml
+          kubectl apply -f k8s/istio-virtualservice.yaml
+          kubectl apply -f k8s/istio-destinationrules.yaml
+          kubectl apply -f k8s/istio-peerauthentication.yaml
+          kubectl apply -f k8s/istio-ingress-service.yaml
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/auth-service -n soiree --timeout=120s
+          kubectl rollout status deployment/event-service -n soiree --timeout=120s
+          kubectl rollout status deployment/rsvp-service -n soiree --timeout=120s
+          kubectl rollout status deployment/frontend -n soiree --timeout=120s
+          echo "All deployments rolled out successfully!"
+
+      - name: Show service endpoints
+        run: |
+          echo "=== Services ==="
+          kubectl get svc -n soiree
+          echo ""
+          echo "=== Istio Ingress ==="
+          kubectl get svc istio-ingressgateway -n istio-system
+          echo ""
+          echo "=== Pods ==="
+          kubectl get pods -n soiree

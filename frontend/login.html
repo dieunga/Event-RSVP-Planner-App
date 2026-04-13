@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Soirée</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Josefin+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-mark">◆</span>
+        <span class="logo-text">Soirée</span>
+      </a>
+    </div>
+  </header>
+
+  <section class="auth-container">
+    <div class="auth-form-wrapper">
+      <div class="auth-header">
+        <h1 class="auth-title">Welcome Back</h1>
+        <p class="auth-subtitle">Sign in to your account</p>
+      </div>
+
+      <div id="errorMsg" style="color: #c94c4c; font-size: 13px; margin-bottom: 15px; text-align: center; display: none;"></div>
+      <div id="successMsg" style="color: #4caf7d; font-size: 13px; margin-bottom: 15px; text-align: center; display: none;"></div>
+
+      <form class="auth-form" id="loginForm">
+        <div class="form-group">
+          <label for="email" class="form-label">Email Address</label>
+          <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com" required />
+        </div>
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required />
+        </div>
+        <button type="submit" class="btn-primary auth-submit">Sign In</button>
+      </form>
+
+      <p class="auth-footer">
+        Don't have an account?
+        <a href="signup.html" class="form-link auth-link">Sign Up</a>
+      </p>
+    </div>
+  </section>
+
+  <script>
+    // Redirect if already logged in
+    if (localStorage.getItem('soiree_token')) {
+      window.location.href = '/';
+    }
+
+    // Show signup success message
+    if (new URLSearchParams(window.location.search).get('signup') === 'success') {
+      const s = document.getElementById('successMsg');
+      s.textContent = 'Account created successfully! Please log in.';
+      s.style.display = 'block';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('errorMsg');
+      errorEl.style.display = 'none';
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errorEl.textContent = data.error || 'Login failed';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        localStorage.setItem('soiree_token', data.token);
+        localStorage.setItem('soiree_email', data.email);
+        localStorage.setItem('soiree_userId', data.userId);
+        window.location.href = '/';
+      } catch (err) {
+        errorEl.textContent = 'Connection error. Please try again.';
+        errorEl.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

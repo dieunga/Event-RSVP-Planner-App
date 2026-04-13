@@ -2,7 +2,7 @@
 require 'config.php';
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    header("Location: /index.php");
     exit;
 }
 
@@ -25,7 +25,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Password is correct, set session
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_email'] = $user['email'];
-        header("Location: index.php");
+        header("Location: /index.php");
         exit;
     } else {
         $error = "Invalid email or password.";

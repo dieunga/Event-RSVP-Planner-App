@@ -25,11 +25,13 @@ variable "instance_type" {
 variable "ami_id" {
   description = "AMI ID for EC2 instance"
   type        = string
+  default     = ""
 }
 
 variable "key_name" {
   description = "AWS EC2 Key Pair name"
   type        = string
+  default     = ""
 }
 
 variable "instance_name" {
@@ -39,7 +41,26 @@ variable "instance_name" {
 }
 
 variable "domain_name" {
-  description = "Domain name for Route53 and ACM (e.g., example.com)"
+  description = "Domain name for Route53 (e.g., example.com)"
   type        = string
-  default     = "mywebsite.local" 
+  default     = "dieunga.io.vn"
+}
+
+variable "project_name" {
+  description = "Project name used for resource naming"
+  type        = string
+  default     = "soiree"
+}
+
+variable "db_username" {
+  description = "RDS database master username"
+  type        = string
+  default     = "admin"
+  sensitive   = true
+}
+
+variable "db_password" {
+  description = "RDS database master password"
+  type        = string
+  sensitive   = true
 }
