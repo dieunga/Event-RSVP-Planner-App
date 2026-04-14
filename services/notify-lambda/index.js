@@ -1,5 +1,5 @@
-const AWS = require("aws-sdk");
-const ses = new AWS.SES({ region: process.env.AWS_REGION || "ap-southeast-1" });
+const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+const ses = new SESClient({ region: process.env.AWS_REGION || "ap-southeast-1" });
 
 exports.handler = async (event) => {
   const headers = {
@@ -80,7 +80,7 @@ exports.handler = async (event) => {
   };
 
   try {
-    await ses.sendEmail(params).promise();
+    await ses.send(new SendEmailCommand(params));
     return {
       statusCode: 200,
       headers,
