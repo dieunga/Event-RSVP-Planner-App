@@ -1,8 +1,20 @@
 #!/bin/bash
-set -e
 exec > /var/log/user-data.log 2>&1
+set -x
 
 echo "=== Starting EC2 setup ==="
+
+# Wait for apt lock to be released (cloud-init may be using it)
+echo "=== Waiting for apt lock ==="
+for i in $(seq 1 30); do
+  if flock -n /var/lib/dpkg/lock-frontend -c true 2>/dev/null && \
+     flock -n /var/lib/apt/lists/lock -c true 2>/dev/null; then
+    echo "apt lock is free"
+    break
+  fi
+  echo "Waiting for apt lock... attempt $i/30"
+  sleep 10
+done
 
 # ==========================================
 # Install packages
@@ -11,7 +23,13 @@ apt-get update -y
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
   apache2 php libapache2-mod-php php-mysql php-cli \
   php-curl php-xml php-mbstring php-zip \
-  unzip curl composer mysql-client awscli
+  unzip curl composer mysql-client
+
+# Install AWS CLI v2 (not available in Ubuntu 24.04 apt repos)
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
 
 # ==========================================
 # Configure Apache
@@ -56,6 +74,15 @@ try {
 }
 ?>
 PHPEOF
+
+# ==========================================
+# Write api_config.php with Lambda API URL
+# ==========================================
+cat > /var/www/html/api_config.php << 'APIEOF'
+<?php
+$notify_api_url = '${notify_api_url}';
+?>
+APIEOF
 
 # ==========================================
 # Initialize DB schema (with retry)
