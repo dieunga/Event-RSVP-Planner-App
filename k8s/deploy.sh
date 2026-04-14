@@ -8,15 +8,37 @@ set -e
 
 CLUSTER_NAME="soiree-eks-cluster"
 AWS_REGION="ap-southeast-1"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISTIO_VERSION="1.21.0"
 
-echo "=== [1/6] Fetching Terraform outputs ==="
-cd "$(dirname "$SCRIPT_DIR")/backend"
+BACKEND_DIR="backend"
+K8S_DIR="k8s"
 
-RDS_ENDPOINT=$(terraform output -raw rds_endpoint 2>/dev/null | cut -d: -f1)
-NOTIFY_API_URL=$(terraform output -raw notify_api_url 2>/dev/null)
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+# Locate binaries — prefer .exe (Windows native) so kubeconfig paths match
+find_bin() {
+  command -v "$1.exe" 2>/dev/null || command -v "$1" 2>/dev/null || { echo "ERROR: '$1' not found in PATH."; exit 1; }
+}
+
+TERRAFORM=$(find_bin terraform)
+AWS=$(find_bin aws)
+KUBECTL=$(find_bin kubectl)
+DOCKER=$(find_bin docker)
+
+echo "  terraform : $TERRAFORM"
+echo "  aws       : $AWS"
+echo "  kubectl   : $KUBECTL"
+echo "  docker    : $DOCKER"
+
+echo "=== [1/6] Fetching Terraform outputs ==="
+
+if [ ! -f "$BACKEND_DIR/terraform.tfstate" ]; then
+  echo "ERROR: Cannot find terraform.tfstate in $BACKEND_DIR"
+  echo "Make sure you run this script from the project root directory."
+  exit 1
+fi
+
+RDS_ENDPOINT=$("$TERRAFORM" -chdir="$BACKEND_DIR" output -raw rds_endpoint | cut -d: -f1 | tr -d '\r') || { echo "ERROR: Failed to get rds_endpoint"; exit 1; }
+NOTIFY_API_URL=$("$TERRAFORM" -chdir="$BACKEND_DIR" output -raw notify_api_url | tr -d '\r') || { echo "ERROR: Failed to get notify_api_url"; exit 1; }
+AWS_ACCOUNT_ID=$("$AWS" sts get-caller-identity --query Account --output text | tr -d '\r') || { echo "ERROR: Failed to get AWS account ID"; exit 1; }
 
 echo "  RDS endpoint : $RDS_ENDPOINT"
 echo "  Notify API   : $NOTIFY_API_URL"
@@ -24,52 +46,54 @@ echo "  Account ID   : $AWS_ACCOUNT_ID"
 
 # =============================================================================
 echo "=== [2/6] Updating kubeconfig for EKS ==="
-aws eks update-kubeconfig \
+"$AWS" eks update-kubeconfig \
   --name "$CLUSTER_NAME" \
   --region "$AWS_REGION"
 
-kubectl cluster-info
+"$KUBECTL" cluster-info
 
 # =============================================================================
 echo "=== [3/6] Installing Istio ${ISTIO_VERSION} ==="
 
 # Download istioctl if not present
-if ! command -v istioctl &>/dev/null; then
+ISTIOCTL=$(command -v istioctl 2>/dev/null || command -v istioctl.exe 2>/dev/null || echo "")
+if [ -z "$ISTIOCTL" ]; then
   echo "  Downloading istioctl..."
   curl -sSL "https://istio.io/downloadIstio" | ISTIO_VERSION="$ISTIO_VERSION" sh -
   export PATH="$PWD/istio-${ISTIO_VERSION}/bin:$PATH"
+  ISTIOCTL="$PWD/istio-${ISTIO_VERSION}/bin/istioctl"
 fi
 
 # Install Istio with default profile
-istioctl install --set profile=default -y
+"$ISTIOCTL" install --set profile=default -y
 
 # Wait for Istio control plane to be ready
 echo "  Waiting for Istio control plane..."
-kubectl rollout status deployment/istiod -n istio-system --timeout=180s
+"$KUBECTL" rollout status deployment/istiod -n istio-system --timeout=180s
 
 # Apply custom Istio ingress gateway service (NLB)
-kubectl apply -f "$SCRIPT_DIR/istio-ingress-service.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/istio-ingress-service.yaml"
 
 echo "  Waiting for Istio ingress gateway..."
-kubectl rollout status deployment/istio-ingressgateway -n istio-system --timeout=120s
+"$KUBECTL" rollout status deployment/istio-ingressgateway -n istio-system --timeout=120s
 
 # =============================================================================
 echo "=== [4/6] Applying base Kubernetes resources ==="
 
 # Namespace with istio-injection enabled
-kubectl apply -f "$SCRIPT_DIR/namespace.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/namespace.yaml"
 
 # ConfigMap — inject actual RDS endpoint from Terraform output
-sed "s|DB_HOST: .*|DB_HOST: \"$RDS_ENDPOINT\"|" "$SCRIPT_DIR/configmap.yaml" | \
-  kubectl apply -f -
+sed "s|DB_HOST: .*|DB_HOST: \"$RDS_ENDPOINT\"|" "$K8S_DIR/configmap.yaml" | \
+  "$KUBECTL" apply -f -
 
 # Kafka and Redis (supporting services)
-kubectl apply -f "$SCRIPT_DIR/kafka.yaml"
-kubectl apply -f "$SCRIPT_DIR/redis.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/kafka.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/redis.yaml"
 
 # Wait for supporting services
 echo "  Waiting for Redis..."
-kubectl rollout status deployment/redis -n soiree --timeout=120s || true
+"$KUBECTL" rollout status deployment/redis -n soiree --timeout=120s || true
 
 # =============================================================================
 echo "=== [5/6] Building and pushing Docker images to ECR ==="
@@ -77,59 +101,62 @@ echo "=== [5/6] Building and pushing Docker images to ECR ==="
 ECR_AUTH_URL="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
 # Authenticate Docker to ECR
-aws ecr get-login-password --region "$AWS_REGION" | \
-  docker login --username AWS --password-stdin "$ECR_AUTH_URL"
-
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+"$AWS" ecr get-login-password --region "$AWS_REGION" | \
+  "$DOCKER" login --username AWS --password-stdin "$ECR_AUTH_URL"
 
 build_and_push() {
   local SERVICE="$1"
   local CONTEXT="$2"
   local ECR_REPO="$3"
   echo "  Building $SERVICE..."
-  docker build -t "$SERVICE:latest" "$CONTEXT"
-  docker tag "$SERVICE:latest" "$ECR_REPO:latest"
-  docker push "$ECR_REPO:latest"
+  "$DOCKER" build -t "$SERVICE:latest" "$CONTEXT"
+  "$DOCKER" tag "$SERVICE:latest" "$ECR_REPO:latest"
+  "$DOCKER" push "$ECR_REPO:latest"
 }
 
-build_and_push "auth-service"   "$PROJECT_ROOT/services/auth-service"   "$ECR_AUTH_URL/soiree/auth-service"
-build_and_push "event-service"  "$PROJECT_ROOT/services/event-service"  "$ECR_AUTH_URL/soiree/event-service"
-build_and_push "rsvp-service"   "$PROJECT_ROOT/services/rsvp-service"   "$ECR_AUTH_URL/soiree/rsvp-service"
-build_and_push "frontend"       "$PROJECT_ROOT/frontend"                "$ECR_AUTH_URL/soiree/frontend"
+build_and_push "auth-service"   "services/auth-service"   "$ECR_AUTH_URL/soiree/auth-service"
+build_and_push "event-service"  "services/event-service"  "$ECR_AUTH_URL/soiree/event-service"
+build_and_push "rsvp-service"   "services/rsvp-service"   "$ECR_AUTH_URL/soiree/rsvp-service"
+build_and_push "frontend"       "frontend"                "$ECR_AUTH_URL/soiree/frontend"
 
 # Replace placeholder account ID in manifests and deploy
 for MANIFEST in auth-service.yaml event-service.yaml rsvp-service.yaml frontend.yaml; do
-  sed "s|<AWS_ACCOUNT_ID>|$AWS_ACCOUNT_ID|g" "$SCRIPT_DIR/$MANIFEST" | \
-    kubectl apply -f -
+  sed "s|<AWS_ACCOUNT_ID>|$AWS_ACCOUNT_ID|g" "$K8S_DIR/$MANIFEST" | \
+    "$KUBECTL" apply -f -
 done
 
 # Wait for all deployments to roll out
 for DEP in auth-service event-service rsvp-service frontend; do
   echo "  Waiting for $DEP..."
-  kubectl rollout status deployment/$DEP -n soiree --timeout=180s
+  "$KUBECTL" rollout status deployment/$DEP -n soiree --timeout=180s
 done
 
 # =============================================================================
 echo "=== [6/6] Applying Istio traffic management ==="
 
-kubectl apply -f "$SCRIPT_DIR/istio-peerauthentication.yaml"
-kubectl apply -f "$SCRIPT_DIR/istio-gateway.yaml"
-kubectl apply -f "$SCRIPT_DIR/istio-virtualservice.yaml"
-kubectl apply -f "$SCRIPT_DIR/istio-destinationrules.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/istio-peerauthentication.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/istio-gateway.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/istio-virtualservice.yaml"
+"$KUBECTL" apply -f "$K8S_DIR/istio-destinationrules.yaml"
 
 # =============================================================================
 echo ""
 echo "=== Deployment complete! ==="
 echo ""
 
-NLB_HOST=$(kubectl get svc istio-ingressgateway -n istio-system \
+NLB_HOST=$("$KUBECTL" get svc istio-ingressgateway -n istio-system \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
 
 echo "  Istio NLB hostname : $NLB_HOST"
 echo "  Namespace          : soiree"
 echo ""
+echo "  Monitoring (access via kubectl port-forward):"
+echo "    Prometheus : kubectl port-forward svc/prometheus 9090:9090 -n monitoring"
+echo "    Grafana    : kubectl port-forward svc/grafana 3000:3000 -n monitoring  (admin / SoireeGrafana2026!)"
+echo "    Splunk     : kubectl port-forward svc/splunk 8000:8000 -n monitoring   (admin / SoireeSplunk2026!)"
+echo ""
 echo "  Next steps:"
 echo "  1. Point dieunga.io.vn → $NLB_HOST in Route53 (or run: bash k8s/update-route53.sh)"
 echo "  2. Verify services:  kubectl get pods -n soiree"
 echo "  3. Verify Istio:     kubectl get pods -n istio-system"
-echo "  4. Check mTLS:       istioctl authn tls-check -n soiree"
+echo "  4. Check mTLS:       $ISTIOCTL authn tls-check -n soiree"
