@@ -40,12 +40,17 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public_rt.id
 }
 
+resource "aws_route_table_association" "eks_public_b_assoc" {
+  subnet_id      = aws_subnet.eks_public_subnet_b.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
 resource "aws_route_table_association" "web_assoc" {
   subnet_id      = aws_subnet.web_subnet.id
   route_table_id = aws_route_table.public_rt.id
 }
 
-# Private RT associations (DB subnets)
+# Private RT associations (DB subnets + EKS worker subnets)
 resource "aws_route_table_association" "db_a_assoc" {
   subnet_id      = aws_subnet.db_subnet_a.id
   route_table_id = aws_route_table.private_rt.id
@@ -53,5 +58,15 @@ resource "aws_route_table_association" "db_a_assoc" {
 
 resource "aws_route_table_association" "db_b_assoc" {
   subnet_id      = aws_subnet.db_subnet_b.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "eks_private_a_assoc" {
+  subnet_id      = aws_subnet.eks_private_subnet_a.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "eks_private_b_assoc" {
+  subnet_id      = aws_subnet.eks_private_subnet_b.id
   route_table_id = aws_route_table.private_rt.id
 }

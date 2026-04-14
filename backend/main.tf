@@ -7,6 +7,7 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
   tags = {
     Name = "my-vpc"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
 }
 
@@ -18,14 +19,29 @@ resource "aws_internet_gateway" "igw" {
 # ==========================================
 # Subnets
 # ==========================================
-# Public subnet (for NAT Gateway) - AZ A
+# Public subnet (for NAT Gateway + NLB AZ A) - AZ A
 resource "aws_subnet" "public_subnet" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "${var.aws_region}a"
   map_public_ip_on_launch = true
   tags = {
-    Name = "Public Subnet - AZ A"
+    Name                                        = "Public Subnet - AZ A"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/role/elb"                    = "1"
+  }
+}
+
+# Public subnet (for NLB AZ B) - AZ B
+resource "aws_subnet" "eks_public_subnet_b" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.7.0/24"
+  availability_zone       = "${var.aws_region}b"
+  map_public_ip_on_launch = true
+  tags = {
+    Name                                        = "EKS Public Subnet - AZ B"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/role/elb"                    = "1"
   }
 }
 
@@ -37,6 +53,29 @@ resource "aws_subnet" "web_subnet" {
   map_public_ip_on_launch = true
   tags = {
     Name = "Web Subnet - AZ A"
+  }
+}
+
+# EKS private subnets (for worker nodes)
+resource "aws_subnet" "eks_private_subnet_a" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.5.0/24"
+  availability_zone = "${var.aws_region}a"
+  tags = {
+    Name                                        = "EKS Private Subnet - AZ A"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/role/internal-elb"           = "1"
+  }
+}
+
+resource "aws_subnet" "eks_private_subnet_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.6.0/24"
+  availability_zone = "${var.aws_region}b"
+  tags = {
+    Name                                        = "EKS Private Subnet - AZ B"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "kubernetes.io/role/internal-elb"           = "1"
   }
 }
 
@@ -84,25 +123,28 @@ resource "aws_eip_association" "ec2_eip_assoc" {
 }
 
 resource "aws_instance" "web" {
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  key_name               = var.key_name
-  subnet_id              = aws_subnet.web_subnet.id
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  ami                         = var.ami_id
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  subnet_id                   = aws_subnet.web_subnet.id
+  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
+  user_data_replace_on_change = true
 
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
-    s3_bucket   = aws_s3_bucket.static_storage.bucket
-    aws_region  = var.aws_region
-    rds_address = aws_db_instance.primary_db.address
-    db_name     = "webdb"
-    db_username = var.db_username
-    db_password = var.db_password
+    s3_bucket      = aws_s3_bucket.static_storage.bucket
+    aws_region     = var.aws_region
+    rds_address    = aws_db_instance.primary_db.address
+    db_name        = "webdb"
+    db_username    = var.db_username
+    db_password    = var.db_password
+    notify_api_url = "${aws_apigatewayv2_stage.default.invoke_url}/notify"
   })
 
   depends_on = [
     aws_db_instance.primary_db,
     aws_s3_object.frontend_files,
+    aws_apigatewayv2_stage.default,
   ]
 
   tags = { Name = var.instance_name }

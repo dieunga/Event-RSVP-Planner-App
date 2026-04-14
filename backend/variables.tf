@@ -46,6 +46,18 @@ variable "domain_name" {
   default     = "dieunga.io.vn"
 }
 
+variable "cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+  default     = "soiree-eks-cluster"
+}
+
+variable "eks_node_instance_type" {
+  description = "Instance type for EKS worker nodes"
+  type        = string
+  default     = "t3.medium"
+}
+
 variable "project_name" {
   description = "Project name used for resource naming"
   type        = string

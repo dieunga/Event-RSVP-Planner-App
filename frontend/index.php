@@ -1,6 +1,12 @@
 <?php
 require 'config.php';
 
+// Load API endpoint if available (created by user_data.sh)
+$notify_api_url = '';
+if (file_exists('api_config.php')) {
+    require_once 'api_config.php';
+}
+
 // Check if the user is logged in. If not, kick them to the login page.
 if (!isset($_SESSION['user_id'])) {
     header("Location: /login.php");
@@ -258,15 +264,20 @@ $display_name = explode('@', $_SESSION['user_email'])[0];
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
 
-  <script src="app.js"></script>
+  <!-- app.js is for API-driven mode, not used in this localStorage-based version -->
+  <!-- <script src="app.js"></script> -->
+  
   <script>
+    const USER_EMAIL   = '<?php echo htmlspecialchars($_SESSION["user_email"], ENT_QUOTES); ?>';
+    const NOTIFY_API   = '<?php echo htmlspecialchars($notify_api_url, ENT_QUOTES); ?>';
+
     // ============================================================
     // DATA LAYER
     // ============================================================
-    let events = JSON.parse(localStorage.getItem('soiree_events') || '[]');
-    let rsvps  = JSON.parse(localStorage.getItem('soiree_rsvps')  || '[]');
-    let activeEventId = null;
-    let currentFilter = 'all';
+    var events = JSON.parse(localStorage.getItem('soiree_events') || '[]');
+    var rsvps  = JSON.parse(localStorage.getItem('soiree_rsvps')  || '[]');
+    var activeEventId = null;
+    var currentFilter = 'all';
 
     function save() {
       localStorage.setItem('soiree_events', JSON.stringify(events));
@@ -303,19 +314,21 @@ $display_name = explode('@', $_SESSION['user_email'])[0];
 
     function renderEvents() {
       const grid = document.getElementById('eventsGrid');
-      const empty = document.getElementById('emptyEvents');
 
       let filtered = events;
       if (currentFilter === 'upcoming') filtered = events.filter(isUpcoming);
       if (currentFilter === 'past')     filtered = events.filter(e => !isUpcoming(e));
 
       if (filtered.length === 0) {
-        grid.innerHTML = '';
-        grid.appendChild(empty);
-        empty.style.display = 'flex';
+        grid.innerHTML = `
+          <div class="empty-state" id="emptyEvents" style="display:flex">
+            <div class="empty-icon">◇</div>
+            <p class="empty-title">No events yet</p>
+            <p class="empty-sub">Create your first event to get started.</p>
+            <button class="btn-primary" onclick="document.getElementById('openCreateModal').click()">+ New Event</button>
+          </div>`;
         return;
       }
-      empty.style.display = 'none';
 
       grid.innerHTML = filtered.map(e => {
         const eventRsvps   = rsvps.filter(r => r.eventId === e.id);
@@ -514,6 +527,15 @@ $display_name = explode('@', $_SESSION['user_email'])[0];
       save(); renderEvents(); updateStats();
       closeModal('createEventModal');
       toast('Event created!');
+
+      // Trigger Lambda notification email
+      if (NOTIFY_API) {
+        fetch(NOTIFY_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail: USER_EMAIL, event })
+        }).catch(() => {}); // silent fail — don't block UX
+      }
     });
 
     // ============================================================
