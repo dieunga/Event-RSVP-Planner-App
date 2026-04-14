@@ -1,127 +1,164 @@
 # ==========================================
 # ACM Certificate (must be in us-east-1 for CloudFront)
 # ==========================================
-# provider "aws" {
-#   alias  = "us_east_1"
-#   region = "us-east-1"
-# }
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
 
-# resource "aws_acm_certificate" "cloudfront_cert" {
-#   provider          = aws.us_east_1
-#   domain_name       = var.domain_name
-#   validation_method = "DNS"
+resource "aws_acm_certificate" "cloudfront_cert" {
+  provider          = aws.us_east_1
+  domain_name       = var.domain_name
+  validation_method = "DNS"
 
-#   lifecycle {
-#     create_before_destroy = true
-#   }
+  lifecycle {
+    create_before_destroy = true
+  }
 
-#   tags = { Name = "${var.project_name}-cloudfront-cert" }
-# }
+  tags = { Name = "soiree-cloudfront-cert" }
+}
 
-# resource "aws_route53_record" "cert_validation" {
-#   for_each = {
-#     for dvo in aws_acm_certificate.cloudfront_cert.domain_validation_options : dvo.domain_name => {
-#       name   = dvo.resource_record_name
-#       record = dvo.resource_record_value
-#       type   = dvo.resource_record_type
-#     }
-#   }
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.cloudfront_cert.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
 
-#   zone_id = aws_route53_zone.main.zone_id
-#   name    = each.value.name
-#   type    = each.value.type
-#   records = [each.value.record]
-#   ttl     = 60
+  zone_id = aws_route53_zone.main.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  records = [each.value.record]
+  ttl     = 60
 
-#   allow_overwrite = true
-# }
+  allow_overwrite = true
+}
 
-# resource "aws_acm_certificate_validation" "cloudfront_cert" {
-#   provider                = aws.us_east_1
-#   certificate_arn         = aws_acm_certificate.cloudfront_cert.arn
-#   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
-# }
+resource "aws_acm_certificate_validation" "cloudfront_cert" {
+  provider                = aws.us_east_1
+  certificate_arn         = aws_acm_certificate.cloudfront_cert.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
 
-# # ==========================================
-# # CloudFront Distribution
-# # ==========================================
-# resource "aws_cloudfront_distribution" "main" {
-#   enabled             = true
-#   is_ipv6_enabled     = true
-#   comment             = "${var.project_name} CloudFront Distribution"
-#   aliases             = [var.domain_name]
-#   price_class         = "PriceClass_200"
-#   wait_for_deployment = false
+# ==========================================
+# Look up the Istio Ingress NLB created by EKS
+# ==========================================
+data "aws_lb" "ingress_lb" {
+  tags = {
+    "kubernetes.io/cluster/soiree-eks-cluster"  = "owned"
+    "kubernetes.io/service-name"                = "istio-system/istio-ingressgateway"
+  }
+}
 
-#   # Origin: Istio Ingress Gateway NLB
-#   origin {
-#     domain_name = data.aws_lb.ingress_lb.dns_name
-#     origin_id   = "istio-ingress"
+# ==========================================
+# CloudFront Distribution
+# ==========================================
+resource "aws_cloudfront_distribution" "main" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "soiree CloudFront Distribution"
+  aliases             = [var.domain_name]
+  price_class         = "PriceClass_200"
+  wait_for_deployment = false
 
-#     custom_origin_config {
-#       http_port              = 80
-#       https_port             = 443
-#       origin_protocol_policy = "http-only"
-#       origin_ssl_protocols   = ["TLSv1.2"]
-#     }
-#   }
+  # Origin: Istio Ingress Gateway NLB
+  origin {
+    domain_name = data.aws_lb.ingress_lb.dns_name
+    origin_id   = "istio-ingress"
 
-#   # Default behavior (frontend static assets)
-#   default_cache_behavior {
-#     target_origin_id       = "istio-ingress"
-#     viewer_protocol_policy = "redirect-to-https"
-#     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-#     cached_methods         = ["GET", "HEAD"]
-#     compress               = true
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
 
-#     forwarded_values {
-#       query_string = false
-#       cookies {
-#         forward = "none"
-#       }
-#     }
+  # Default behavior (frontend static assets)
+  default_cache_behavior {
+    target_origin_id       = "istio-ingress"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
 
-#     min_ttl     = 0
-#     default_ttl = 3600
-#     max_ttl     = 86400
-#   }
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
 
-#   # API paths — no caching, forward everything
-#   ordered_cache_behavior {
-#     path_pattern           = "/api/*"
-#     target_origin_id       = "istio-ingress"
-#     viewer_protocol_policy = "redirect-to-https"
-#     allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-#     cached_methods         = ["GET", "HEAD"]
-#     compress               = true
+    min_ttl     = 0
+    default_ttl = 3600
+    max_ttl     = 86400
+  }
 
-#     forwarded_values {
-#       query_string = true
-#       headers      = ["Authorization", "Origin", "Accept"]
-#       cookies {
-#         forward = "all"
-#       }
-#     }
+  # API paths — no caching, forward everything including auth headers
+  ordered_cache_behavior {
+    path_pattern           = "/api/*"
+    target_origin_id       = "istio-ingress"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
 
-#     min_ttl     = 0
-#     default_ttl = 0
-#     max_ttl     = 0
-#   }
+    forwarded_values {
+      query_string = true
+      headers      = ["Authorization", "Origin", "Accept", "Content-Type"]
+      cookies {
+        forward = "all"
+      }
+    }
 
-#   # TLS certificate
-#   viewer_certificate {
-#     acm_certificate_arn      = aws_acm_certificate_validation.cloudfront_cert.certificate_arn
-#     ssl_support_method       = "sni-only"
-#     minimum_protocol_version = "TLSv1.2_2021"
-#   }
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
+  }
 
-#   restrictions {
-#     geo_restriction {
-#       restriction_type = "none"
-#     }
-#   }
+  # TLS certificate
+  viewer_certificate {
+    acm_certificate_arn      = aws_acm_certificate_validation.cloudfront_cert.certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
 
-#   tags = { Name = "${var.project_name}-cloudfront" }
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
 
-#   depends_on = [aws_eks_node_group.main]
-# }
+  tags = { Name = "soiree-cloudfront" }
+
+  depends_on = [aws_acm_certificate_validation.cloudfront_cert]
+}
+
+# ==========================================
+# Route53 — point domain at CloudFront
+# ==========================================
+resource "aws_route53_record" "cloudfront" {
+  zone_id         = aws_route53_zone.main.zone_id
+  name            = var.domain_name
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = aws_cloudfront_distribution.main.domain_name
+    zone_id                = aws_cloudfront_distribution.main.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+# ==========================================
+# Outputs
+# ==========================================
+output "cloudfront_domain" {
+  value = aws_cloudfront_distribution.main.domain_name
+}
+
+output "cloudfront_distribution_id" {
+  value = aws_cloudfront_distribution.main.id
+}
