@@ -129,11 +129,29 @@ jobs:
 
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/auth-service -n soiree --timeout=120s
-          kubectl rollout status deployment/event-service -n soiree --timeout=120s
-          kubectl rollout status deployment/rsvp-service -n soiree --timeout=120s
-          kubectl rollout status deployment/frontend -n soiree --timeout=120s
+          kubectl rollout status deployment/auth-service -n soiree --timeout=300s
+          kubectl rollout status deployment/event-service -n soiree --timeout=300s
+          kubectl rollout status deployment/rsvp-service -n soiree --timeout=300s
+          kubectl rollout status deployment/frontend -n soiree --timeout=300s
           echo "All deployments rolled out successfully!"
+
+      - name: Diagnose on failure
+        if: failure()
+        run: |
+          echo "=== Pod Status ==="
+          kubectl get pods -n soiree -o wide
+          echo ""
+          echo "=== Pod Events ==="
+          kubectl describe pods -n soiree | grep -A 20 "Events:"
+          echo ""
+          echo "=== auth-service logs ==="
+          kubectl logs -l app=auth-service -n soiree --tail=50 || true
+          echo ""
+          echo "=== event-service logs ==="
+          kubectl logs -l app=event-service -n soiree --tail=50 || true
+          echo ""
+          echo "=== rsvp-service logs ==="
+          kubectl logs -l app=rsvp-service -n soiree --tail=50 || true
 
       - name: Show service endpoints
         run: |
