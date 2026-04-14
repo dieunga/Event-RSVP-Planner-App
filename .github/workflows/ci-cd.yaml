@@ -25,11 +25,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install dependencies
         working-directory: services/${{ matrix.service }}
-        run: npm ci
+        run: npm install --omit=dev
+
+      - name: Check syntax
+        working-directory: services/${{ matrix.service }}
+        run: node --check server.js
 
   # ── Build and Push Docker Images ──
   build-push-images:
