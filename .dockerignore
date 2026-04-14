@@ -1,0 +1,9 @@
+backend/
+k8s/
+.github/
+*.tf
+*.tfstate
+*.tfvars
+.git
+gitignore
+README.md
