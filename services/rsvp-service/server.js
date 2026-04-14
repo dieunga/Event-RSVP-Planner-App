@@ -272,11 +272,21 @@ app.delete('/api/rsvps/:id', authenticate, async (req, res) => {
 });
 
 // ── Start server ──
-initDB().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`RSVP service running on port ${PORT}`);
-  });
-}).catch(err => {
-  console.error('Failed to initialize database:', err);
-  process.exit(1);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`RSVP service running on port ${PORT}`);
 });
+
+(async function initWithRetry() {
+  for (let attempt = 1; attempt <= 15; attempt++) {
+    try {
+      await initDB();
+      return;
+    } catch (err) {
+      const delay = Math.min(5000 * attempt, 30000);
+      console.warn(`DB init attempt ${attempt}/15 failed: ${err.message}. Retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  console.error('Failed to initialize database after 15 attempts, exiting.');
+  process.exit(1);
+})();
