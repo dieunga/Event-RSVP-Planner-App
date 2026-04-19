@@ -1,6 +1,6 @@
 # Soirée — Event RSVP Planner (Microservices)
 
-🎥 **[Watch Demo Video](https://buveduvn0-my.sharepoint.com/personal/nga_nd_st_buv_edu_vn/_layouts/15/guestaccess.aspx?share=IQAAG8J22veVTLcJuZm6h1IUAXc1RA7scl2uOnczqZGXN5o&e=BjLckU)**
+🎥 **[Watch Demo Video](https://buveduvn0-my.sharepoint.com/personal/nga_nd_st_buv_edu_vn/_layouts/15/guestaccess.aspx?share=IQCTzTV_aWdRRKG-m1WzJ-_JAQJ5x7aTyFjh_DOgQ2da6og&e=TamBlF)**
 
 
 A cloud-native event management application built with microservices architecture, deployed on AWS EKS with Istio service mesh.
