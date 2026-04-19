@@ -202,6 +202,16 @@ app.post('/api/events', authenticate, async (req, res) => {
     await invalidateCache(req.user.userId);
     await publishEvent('event-created', { eventId: id, userId: req.user.userId, name, date, timestamp: new Date().toISOString() });
 
+    // Send confirmation email via Lambda
+    const NOTIFY_URL = process.env.NOTIFY_URL;
+    if (NOTIFY_URL && req.user.email) {
+      fetch(`${NOTIFY_URL}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: req.user.email, event }),
+      }).catch(err => console.warn('Notify Lambda error:', err.message));
+    }
+
     res.status(201).json(event);
   } catch (err) {
     console.error('Create event error:', err);

@@ -105,6 +105,9 @@ resource "aws_instance" "monitoring" {
       - job_name: 'prometheus'
         static_configs:
           - targets: ['localhost:9090']
+      - job_name: 'node'
+        static_configs:
+          - targets: ['localhost:9100']
     PROMEOF
 
     useradd --no-create-home --shell /bin/false prometheus
@@ -133,6 +136,33 @@ resource "aws_instance" "monitoring" {
     systemctl start prometheus
 
     # ==========================================
+    # Install Node Exporter
+    # ==========================================
+    NODE_EXP_VERSION="1.7.0"
+    wget -q "https://github.com/prometheus/node_exporter/releases/download/v$${NODE_EXP_VERSION}/node_exporter-$${NODE_EXP_VERSION}.linux-amd64.tar.gz" -O /tmp/node_exporter.tar.gz
+    tar -xzf /tmp/node_exporter.tar.gz -C /tmp
+    mv /tmp/node_exporter-$${NODE_EXP_VERSION}.linux-amd64/node_exporter /usr/local/bin/
+    useradd --no-create-home --shell /bin/false node_exporter || true
+
+    cat > /etc/systemd/system/node_exporter.service << 'NODEEOF'
+    [Unit]
+    Description=Node Exporter
+    After=network.target
+
+    [Service]
+    User=node_exporter
+    ExecStart=/usr/local/bin/node_exporter
+    Restart=always
+
+    [Install]
+    WantedBy=multi-user.target
+    NODEEOF
+
+    systemctl daemon-reload
+    systemctl enable node_exporter
+    systemctl start node_exporter
+
+    # ==========================================
     # Install Grafana
     # ==========================================
     wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
@@ -150,6 +180,242 @@ resource "aws_instance" "monitoring" {
         isDefault: true
         editable: true
     GRAFEOF
+
+    # ---- Dashboard provisioner config ----
+    mkdir -p /var/lib/grafana/dashboards
+
+    cat > /etc/grafana/provisioning/dashboards/default.yaml << 'DASHPROVEOF'
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: Server Monitoring
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+    DASHPROVEOF
+
+    # ---- Server Monitoring Dashboard JSON ----
+    cat > /var/lib/grafana/dashboards/server-monitoring.json << 'DASHEOF'
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "graphTooltip": 1,
+      "id": null,
+      "panels": [
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"},
+              "max": 100, "min": 0, "unit": "percent",
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]}
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "id": 1,
+          "options": {"legend": {"calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "CPU Usage %", "refId": "A"}
+          ],
+          "title": "CPU Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"},
+              "max": 100, "min": 0, "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "id": 2,
+          "options": {"legend": {"calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100", "legendFormat": "Memory Usage %", "refId": "A"}
+          ],
+          "title": "Memory Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"},
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "id": 3,
+          "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "rate(node_disk_read_bytes_total[5m])", "legendFormat": "Read - {{device}}", "refId": "A"},
+            {"datasource": {"type": "prometheus"}, "expr": "rate(node_disk_written_bytes_total[5m])", "legendFormat": "Write - {{device}}", "refId": "B"}
+          ],
+          "title": "Disk I/O",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"},
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "id": 4,
+          "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "In - {{device}}", "refId": "A"},
+            {"datasource": {"type": "prometheus"}, "expr": "rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "Out - {{device}}", "refId": "B"}
+          ],
+          "title": "Network Traffic",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"},
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "id": 5,
+          "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "node_load1", "legendFormat": "1m", "refId": "A"},
+            {"datasource": {"type": "prometheus"}, "expr": "node_load5", "legendFormat": "5m", "refId": "B"},
+            {"datasource": {"type": "prometheus"}, "expr": "node_load15", "legendFormat": "15m", "refId": "C"}
+          ],
+          "title": "System Load Average",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "palette-classic"},
+              "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"},
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "id": 6,
+          "options": {"legend": {"calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "1 - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"}", "legendFormat": "Disk Used %", "refId": "A"}
+          ],
+          "title": "Filesystem Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "max": 100, "min": 0,
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]},
+              "unit": "percent"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+          "id": 7,
+          "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdLabels": false, "showThresholdMarkers": true},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "CPU %", "refId": "A"}
+          ],
+          "title": "CPU %",
+          "type": "gauge"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "max": 100, "min": 0,
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]},
+              "unit": "percent"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+          "id": 8,
+          "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdLabels": false, "showThresholdMarkers": true},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100", "legendFormat": "Memory %", "refId": "A"}
+          ],
+          "title": "Memory %",
+          "type": "gauge"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "max": 100, "min": 0,
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]},
+              "unit": "percent"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+          "id": 9,
+          "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "showThresholdLabels": false, "showThresholdMarkers": true},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"}) * 100", "legendFormat": "Disk %", "refId": "A"}
+          ],
+          "title": "Disk %",
+          "type": "gauge"
+        },
+        {
+          "datasource": {"type": "prometheus"},
+          "fieldConfig": {
+            "defaults": {
+              "color": {"fixedColor": "blue", "mode": "fixed"},
+              "mappings": [],
+              "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+              "unit": "s"
+            }
+          },
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24},
+          "id": 10,
+          "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"]}},
+          "targets": [
+            {"datasource": {"type": "prometheus"}, "expr": "node_time_seconds - node_boot_time_seconds", "legendFormat": "Uptime", "refId": "A"}
+          ],
+          "title": "Uptime",
+          "type": "stat"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "tags": ["server", "monitoring"],
+      "time": {"from": "now-3h", "to": "now"},
+      "timepicker": {},
+      "title": "Server Monitoring",
+      "uid": "server-monitoring",
+      "version": 1
+    }
+    DASHEOF
+
+    chown -R grafana:grafana /var/lib/grafana/dashboards
 
     systemctl daemon-reload
     systemctl enable grafana-server

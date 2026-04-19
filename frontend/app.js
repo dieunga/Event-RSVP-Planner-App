@@ -149,7 +149,6 @@ function renderEvents() {
 
   if (filtered.length === 0) {
     grid.innerHTML = '';
-    grid.appendChild(empty);
     empty.style.display = 'flex';
     return;
   }
@@ -235,9 +234,9 @@ function renderRsvpTable() {
         await deleteRsvp(btn.dataset.rsvpid);
         rsvps = rsvps.filter(r => r.id !== btn.dataset.rsvpid);
         renderRsvpTable(); updateStats();
-        toast('RSVP removed');
+
       } catch (err) {
-        toast('Failed to remove RSVP');
+
       }
     });
   });
@@ -306,9 +305,9 @@ function renderGuestList() {
         rsvps = rsvps.filter(r => r.id !== btn.dataset.rid);
         renderGuestList();
         updateStats(); renderEvents();
-        toast('Guest removed');
+
       } catch (err) {
-        toast('Failed to remove guest');
+
       }
     });
   });
@@ -319,12 +318,7 @@ function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
 // ── Toast ──
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2800);
-}
+function toast(msg) {}
 
 // ── Initialize on page load ──
 document.addEventListener('DOMContentLoaded', async () => {
@@ -390,7 +384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       events.unshift(event);
       renderEvents(); updateStats();
       closeModal('createEventModal');
-      toast('Event created!');
+
     } catch (err2) {
       err.textContent = err2.message;
     }
@@ -415,7 +409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('rsvpEmail').value = '';
       renderGuestList();
       updateStats(); renderEvents();
-      toast('RSVP added!');
+
     } catch (err2) {
       err.textContent = err2.message;
     }
@@ -430,9 +424,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       rsvps = rsvps.filter(r => r.event_id !== activeEventId);
       renderEvents(); renderRsvpTable(); updateStats();
       closeModal('eventDetailModal');
-      toast('Event deleted');
+
     } catch (err) {
-      toast('Failed to delete event');
+
     }
   });
 

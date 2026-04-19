@@ -44,12 +44,19 @@ resource "aws_acm_certificate_validation" "cloudfront_cert" {
 
 # ==========================================
 # Look up the Istio Ingress NLB created by EKS
+# Only performed when ingress_lb_dns is not provided manually
 # ==========================================
 data "aws_lb" "ingress_lb" {
+  count = var.ingress_lb_dns == "" ? 1 : 0
+
   tags = {
     "kubernetes.io/cluster/soiree-eks-cluster"  = "owned"
     "kubernetes.io/service-name"                = "istio-system/istio-ingressgateway"
   }
+}
+
+locals {
+  ingress_lb_dns_name = var.ingress_lb_dns != "" ? var.ingress_lb_dns : data.aws_lb.ingress_lb[0].dns_name
 }
 
 # ==========================================
@@ -65,7 +72,7 @@ resource "aws_cloudfront_distribution" "main" {
 
   # Origin: Istio Ingress Gateway NLB
   origin {
-    domain_name = data.aws_lb.ingress_lb.dns_name
+    domain_name = local.ingress_lb_dns_name
     origin_id   = "istio-ingress"
 
     custom_origin_config {

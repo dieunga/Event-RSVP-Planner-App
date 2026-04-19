@@ -7,8 +7,8 @@ metadata:
 spec:
   hosts:
     - "dieunga.io.vn"
-    - "d30otfkkh4uqoh.cloudfront.net"
-    - "a3fa8840a7efa4e57acf9f31d05b72a9-1fe31b8011710579.elb.ap-southeast-1.amazonaws.com"
+    - "d1clq03ehscbtl.cloudfront.net"
+    - "a6d824ddd04284474b262eb480ff458c-c9583e550b212063.elb.ap-southeast-1.amazonaws.com"
   gateways:
     - soiree-gateway
   http:

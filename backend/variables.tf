@@ -76,3 +76,9 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
+
+variable "ingress_lb_dns" {
+  description = "DNS name of the Istio Ingress NLB. Leave empty to auto-discover via tags."
+  type        = string
+  default     = ""
+}
