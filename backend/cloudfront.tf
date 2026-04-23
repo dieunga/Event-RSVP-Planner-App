@@ -44,7 +44,6 @@ resource "aws_acm_certificate_validation" "cloudfront_cert" {
 
 # ==========================================
 # Look up the Istio Ingress NLB created by EKS
-# Only performed when ingress_lb_dns is not provided manually
 # ==========================================
 data "aws_lb" "ingress_lb" {
   count = var.ingress_lb_dns == "" ? 1 : 0
@@ -70,7 +69,7 @@ resource "aws_cloudfront_distribution" "main" {
   price_class         = "PriceClass_200"
   wait_for_deployment = false
 
-  # Origin: Istio Ingress Gateway NLB
+  # Istio Ingress Gateway NLB
   origin {
     domain_name = local.ingress_lb_dns_name
     origin_id   = "istio-ingress"
@@ -83,7 +82,7 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  # Default behavior (frontend static assets)
+  # Default behavior 
   default_cache_behavior {
     target_origin_id       = "istio-ingress"
     viewer_protocol_policy = "redirect-to-https"
@@ -103,7 +102,7 @@ resource "aws_cloudfront_distribution" "main" {
     max_ttl     = 86400
   }
 
-  # API paths — no caching, forward everything including auth headers
+  # API paths 
   ordered_cache_behavior {
     path_pattern           = "/api/*"
     target_origin_id       = "istio-ingress"
@@ -144,7 +143,7 @@ resource "aws_cloudfront_distribution" "main" {
 }
 
 # ==========================================
-# Route53 — point domain at CloudFront
+# Route53
 # ==========================================
 resource "aws_route53_record" "cloudfront" {
   zone_id         = aws_route53_zone.main.zone_id

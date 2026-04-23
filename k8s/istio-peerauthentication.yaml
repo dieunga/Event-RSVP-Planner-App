@@ -1,4 +1,4 @@
-# Istio PeerAuthentication - enforce mTLS between services
+# Istio PeerAuthentication 
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
@@ -8,8 +8,7 @@ spec:
   mtls:
     mode: STRICT
 ---
-# Istio AuthorizationPolicy - allow traffic between services
-apiVersion: security.istio.io/v1beta1
+# Istio AuthorizationPolicy 
 kind: AuthorizationPolicy
 metadata:
   name: allow-intra-namespace

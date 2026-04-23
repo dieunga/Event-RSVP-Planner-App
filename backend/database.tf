@@ -1,3 +1,6 @@
+# ==========================================
+# RDS Database
+# ==========================================
 resource "aws_db_subnet_group" "main" {
   name       = "main-db-subnet-group"
   subnet_ids = [aws_subnet.db_subnet_a.id, aws_subnet.db_subnet_b.id]

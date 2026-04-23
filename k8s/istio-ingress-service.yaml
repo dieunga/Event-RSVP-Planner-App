@@ -1,4 +1,4 @@
-# Expose Istio Ingress Gateway via AWS Network Load Balancer (Internet-facing)
+# Expose Istio Ingress Gateway via AWS Network Load Balancer 
 apiVersion: v1
 kind: Service
 metadata:

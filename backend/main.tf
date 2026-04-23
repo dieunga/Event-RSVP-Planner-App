@@ -79,7 +79,7 @@ resource "aws_subnet" "eks_private_subnet_b" {
   }
 }
 
-# DB subnets (for RDS - requires 2 AZs)
+# DB subnets (for RDS)
 resource "aws_subnet" "db_subnet_a" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.3.0/24"

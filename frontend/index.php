@@ -1,7 +1,7 @@
 <?php
 require 'config.php';
 
-// Load API endpoint if available (created by user_data.sh)
+// Load API endpoint if available 
 $notify_api_url = '';
 if (file_exists('api_config.php')) {
     require_once 'api_config.php';
@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Optional: Extract just the name from the email for display
+//Extract just the name from the email for display
 $display_name = explode('@', $_SESSION['user_email'])[0];
 ?>
 <!DOCTYPE html>

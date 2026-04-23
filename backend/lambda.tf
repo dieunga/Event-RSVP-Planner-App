@@ -124,5 +124,5 @@ resource "aws_lambda_permission" "apigw" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.notify.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.notify_api.execution_arn}/*/*"
-}
+  source_arn    = "${aws_apigatewayv2_api.notify_api.execution_arn}/*/
+

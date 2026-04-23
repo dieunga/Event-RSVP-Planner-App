@@ -1,6 +1,5 @@
 #!/bin/bash
 # =============================================================================
-# Soirée — EKS + Istio Deployment Script
 # Run from the project root after `terraform apply` has completed
 # Usage: bash k8s/deploy.sh
 # =============================================================================
@@ -13,7 +12,7 @@ ISTIO_VERSION="1.21.0"
 BACKEND_DIR="backend"
 K8S_DIR="k8s"
 
-# Locate binaries — prefer .exe (Windows native) so kubeconfig paths match
+# Locate binaries 
 find_bin() {
   command -v "$1.exe" 2>/dev/null || command -v "$1" 2>/dev/null || { echo "ERROR: '$1' not found in PATH."; exit 1; }
 }
@@ -87,7 +86,7 @@ echo "=== [4/6] Applying base Kubernetes resources ==="
 sed "s|DB_HOST: .*|DB_HOST: \"$RDS_ENDPOINT\"|" "$K8S_DIR/configmap.yaml" | \
   "$KUBECTL" apply -f -
 
-# Kafka and Redis (supporting services)
+# Kafka and Redis 
 "$KUBECTL" apply -f "$K8S_DIR/kafka.yaml"
 "$KUBECTL" apply -f "$K8S_DIR/redis.yaml"
 
