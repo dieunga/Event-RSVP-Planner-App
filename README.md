@@ -1,5 +1,5 @@
 # Soirée — Event RSVP Planner (Microservices)
-=======
+
 🎥 **[Watch Demo Video](https://buveduvn0-my.sharepoint.com/personal/nga_nd_st_buv_edu_vn/_layouts/15/guestaccess.aspx?share=IQDvhhtS9SmLTIwR8NLA9RDBAZsBPZ9i8c1-V367HvUgBKI&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=P2NSaN)**
 
 
@@ -19,22 +19,6 @@ Internet → Route 53 → NLB (Internet-facing) → Istio Ingress Gateway
                                       ├── Redis (Sessions/Cache)
                                       └── Kafka (Event Messaging)
 ```
-
-## Requirements Checklist
-
-| Requirement | Status | Implementation |
-|---|---|---|
-| Local app (Node.js) | Done | 3 Node.js microservices + Nginx frontend |
-| AWS RDS | Done | MySQL 8.0 on `db.t3.micro` |
-| AWS EKS deployment | Done | EKS cluster with managed node groups |
-| K8s YAML configs | Done | Full manifests in `k8s/` directory |
-| Istio service mesh | Done | Gateway, VirtualService, DestinationRules, mTLS |
-| Internet-facing LB | Done | NLB via Istio Ingress Gateway |
-| Route 53 access | Done | A-record alias to NLB |
-| CI/CD pipeline | Done | GitHub Actions (build → push → deploy) |
-| Terraform (IaC) | Done | EKS, VPC, RDS, ECR, IAM, Route53 |
-| Kafka | Done | Confluent Kafka on K8s for event messaging |
-| Redis | Done | Redis for session storage and caching |
 
 ## Project Structure
 
