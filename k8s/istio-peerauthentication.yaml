@@ -9,6 +9,7 @@ spec:
     mode: STRICT
 ---
 # Istio AuthorizationPolicy 
+apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: allow-intra-namespace
