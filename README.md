@@ -206,3 +206,11 @@ GitHub Actions pipeline (`.github/workflows/ci-cd.yaml`) automates:
 - `POST /api/rsvps` — Create RSVP
 - `PUT /api/rsvps/:id` — Update RSVP
 - `DELETE /api/rsvps/:id` — Delete RSVP
+
+
+## Notes
+
+### Ignore Files
+
+Any `.gitignore`, `.dockerignore`, or similar ignore files present in the repository are **system/tooling files** and are not important to the application itself. They simply tell Git or Docker which files to exclude and can be safely disregarded when reviewing the project.
+
